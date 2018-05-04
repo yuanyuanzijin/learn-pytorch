@@ -103,3 +103,4 @@ ENV/
 # Zijin
 data/
 .idea/
+test.py
