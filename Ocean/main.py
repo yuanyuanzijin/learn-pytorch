@@ -1,6 +1,7 @@
 from config import opt
 import os
 import torch as t
+import torch.nn.functional as F
 import models
 from dataset.dataset import Ocean
 from torch.utils.data import DataLoader
@@ -28,7 +29,8 @@ def train(**kwargs):
     val_dataloader = DataLoader(val_data, opt.batch_size, shuffle=False, num_workers=opt.num_workers)
 
     # step3: criterion and optimizer
-    criterion = t.nn.CrossEntropyLoss()
+    #loss_fn = t.nn.BCELoss(reduce=False, size_average=False)
+    criterion = t.nn.CrossEntropyLoss(weight=t.Tensor([1, 5]).cuda())
     lr = opt.lr
     optimizer = t.optim.Adam(model.parameters(), lr=lr, weight_decay=opt.weight_decay)
 
@@ -53,6 +55,7 @@ def train(**kwargs):
 
             optimizer.zero_grad()
             score = model(input)
+            print(score, target)
             loss = criterion(score, target)
             loss.backward()
             optimizer.step()
@@ -63,8 +66,6 @@ def train(**kwargs):
 
             if ii % opt.print_freq == opt.print_freq - 1:
                 vis.plot('loss', loss_meter.value()[0])
-
-        model.save()
 
         # validate and visualize
         train_cm, train_accuracy = val(model, train_dataloader)
@@ -88,6 +89,9 @@ def train(**kwargs):
                 param_group['lr'] = lr
 
         previous_loss = loss_meter.value()[0]
+
+        if epoch % 10 == 9:
+            model.save()
 
 def val(model, dataloader):
     """

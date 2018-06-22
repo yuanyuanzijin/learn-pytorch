@@ -7,11 +7,11 @@ import torch as t
 import json
 
 class AppData(data.Dataset):
-    def __init__(self, datapath, iflabel=True):
+    def __init__(self, datapath, iflabel=True, data_length=1):
         self.iflabel = iflabel
         self.datapath = datapath
         with open(datapath) as f:
-            self.data = json.loads(f.read())
+            self.data = json.loads(f.read())[str(data_length)]
 
 
     def __getitem__(self, index):
@@ -41,7 +41,7 @@ class AppData(data.Dataset):
         else:
             one_hot_device[21] = 1
         one_hot = t.cat([one_hot_source, one_hot_device], dim=0)
-        #active_percent = t.FloatTensor([self.data[index]['active_percent']])
+        #days = t.FloatTensor([len(self.data[index]['data'])])
         #user_new = t.Tensor([int(self.data[index]['new'])])
         #properties = t.cat([one_hot, active_percent], dim=0)
 
@@ -53,4 +53,3 @@ class AppData(data.Dataset):
 
     def __len__(self):
         return len(self.data)
-

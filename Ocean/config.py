@@ -9,7 +9,7 @@ class DefaultConfig(object):
     test_data_root = os.path.join('data', 'beautiful.mat')
     load_model_path = None  # 加载预训练的模型的路径，为None代表不加载
 
-    batch_size = 32  # batch size
+    batch_size = 45  # batch size
     use_gpu = True  # user GPU or not
     num_workers = 4  # how many workers for loading data
     print_freq = 5  # print info every N batch
@@ -17,10 +17,10 @@ class DefaultConfig(object):
     debug_file = '/tmp/debug'  # if os.path.exists(debug_file): enter ipdb
     result_file = 'result.csv'
 
-    max_epoch = 500
+    max_epoch = 1000
     lr = 0.05  # initial learning rate
     lr_decay = 0.98  # when val_loss increase, lr = lr*lr_decay
-    weight_decay = 0.0005  # 损失函数
+    weight_decay = 0.0003  # 损失函数
 
 
 def parse(self, kwargs):

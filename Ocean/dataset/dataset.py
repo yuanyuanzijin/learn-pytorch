@@ -12,12 +12,15 @@ class Ocean(data.Dataset):
         if mode == 'train':
             self.data = t.from_numpy(load_data['train_data']).float()
             self.label = t.from_numpy(load_data['train_label']).squeeze()
+            print(len(self.data))
         elif mode == 'val':
-            self.data = t.from_numpy(load_data['test_data']).float()[:90]
-            self.label = t.from_numpy(load_data['test_label']).squeeze()[:90]
+            self.data = t.from_numpy(load_data['test_data']).float()[45:135]
+            self.label = t.from_numpy(load_data['test_label']).squeeze()[45:135]
         elif mode == 'test':
-            self.data = t.from_numpy(load_data['test_data']).float()[90:]
-            self.label = t.from_numpy(load_data['test_label']).squeeze()[90:]
+            test_data = t.from_numpy(load_data['test_data']).float()
+            test_label = t.from_numpy(load_data['test_label']).squeeze()
+            self.data = test_data[0:45].append(test_data[135:])
+            self.label = test_label[0:45].append(test_label[135:])
         else:
             warnings.warn("Warning: Invalid mode! Mode should be train, val or test.")
 

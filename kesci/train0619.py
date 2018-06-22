@@ -2,7 +2,7 @@ import torch as t
 from torch import nn
 from torch.autograd import Variable
 import torch.nn.functional as F
-from dataset.dataset import AppData
+from dataset.dataset0619 import AppData
 from torch.utils.data import DataLoader
 from torchnet import meter
 from utils.visualize import Visualizer
@@ -15,8 +15,8 @@ class Sequence(BasicModule):
         super(Sequence, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_dim, 2, batch_first=True)
         self.fc = nn.Linear(hidden_dim, n_class)
-        self.fc2 = nn.Linear(34, 64)
-        self.fc3 = nn.Linear(64, 1)
+        self.fc2 = nn.Linear(34, 32)
+        self.fc3 = nn.Linear(32, 1)
         self.fc4 = nn.Linear(2, 6)
         self.fc5 = nn.Linear(6, 2)
 
@@ -30,18 +30,16 @@ class Sequence(BasicModule):
         out = self.fc5(out)
         return out
 
+
 def train():
     vis = Visualizer("Kesci")
-    train_data = AppData("data/train_23d_1p_ap.json", iflabel=True)
-    val_data = AppData("data/val_23d_1p_ap.json", iflabel=True)
-    train_dataloader = DataLoader(train_data, 256, shuffle=True, num_workers=4)
-    val_dataloader = DataLoader(val_data, 256, shuffle=False, num_workers=2)
-    test_data = AppData("data/test_23d_1p_ap.json", iflabel=True)
-    test_dataloader = DataLoader(test_data, 256, shuffle=False, num_workers=2)
+    train_dataloader_list = [DataLoader(AppData("data/train_23d_change.json", iflabel=True, data_length=24-length), 64, shuffle=True, num_workers=4) for length in range(1, 24)]
+    val_dataloader_list = [DataLoader(AppData("data/val_23d_change.json", iflabel=True, data_length=24-length), 128, shuffle=False, num_workers=2) for length in range(1, 24)]
+    test_dataloader_list = [DataLoader(AppData("data/test_23d_change.json", iflabel=True, data_length=24-length), 128, shuffle=False, num_workers=2) for length in range(1, 24)]
 
     criterion = t.nn.CrossEntropyLoss(weight=t.Tensor([1, 1.2])).cuda()
-    learning_rate = 0.0005
-    weight_decay = 0.0002
+    learning_rate = 0.001
+    weight_decay = 0.0005
     model = Sequence(15, 128, 1).cuda()
     optimizer = t.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
@@ -53,27 +51,28 @@ def train():
         loss_meter.reset()
         confusion_matrix.reset()
 
-        for ii, (data, property, label) in tqdm(enumerate(train_dataloader)):
-            input = Variable(data).cuda()
-            input2 = Variable(property).cuda()
-            target = Variable(label).cuda().view(-1)
-            output = model(input, input2)
+        for dataloader in train_dataloader_list:
+            for ii, (data, property, label) in tqdm(enumerate(dataloader)):
+                input = Variable(data).cuda()
+                input2 = Variable(property).cuda()
+                target = Variable(label).cuda().view(-1)
+                output = model(input, input2)
 
-            optimizer.zero_grad()
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                loss = criterion(output, target) 
+                loss.backward()
+                optimizer.step()
 
-            loss_meter.add(loss.data[0])
-            confusion_matrix.add(output.data, target.data)
+                loss_meter.add(loss.data[0])
+                confusion_matrix.add(output.data, target.data)
 
-            if ii % 100 == 99:
-                vis.plot('loss', loss_meter.value()[0])
+            #if ii % 100 == 99:
+            vis.plot('loss', loss_meter.value()[0])
 
         if epoch % 3 == 2:
-            train_cm, train_f1 = val(model, train_dataloader)
+            train_cm, train_f1 = val(model, train_dataloader_list)
             vis.plot('train_f1', train_f1)
-        val_cm, val_f1 = val(model, val_dataloader)
+        val_cm, val_f1 = val(model, val_dataloader_list)
 
         vis.plot_many({
             'val_f1': val_f1,
@@ -94,23 +93,24 @@ def train():
 
         if epoch % 10 == 9:
             model.save()
-            test_cm, test_f1 = val(model, test_dataloader)
+            test_cm, test_f1 = val(model, test_dataloader_list)
             vis.plot('test_f1', test_f1)
             vis.log("{train_f1}, {val_f1}, {test_f1}, model:{model}, {train_cm}, {val_cm}, {test_cm}".format(
                 train_f1=train_f1, val_f1=val_f1, test_f1=test_f1, model=time.strftime('%m%d %H:%M:%S'),
                 train_cm=str(train_cm.value()), val_cm=str(val_cm.value()), test_cm=str(test_cm.value())))
 
 
-def val(model, dataloader):
+def val(model, dataloader_list):
     model.eval()
     confusion_matrix = meter.ConfusionMeter(2)
-    for ii, data in tqdm(enumerate(dataloader)):
-        input, property, label = data
-        label = label.view(-1)
-        val_input = Variable(input, volatile=True).cuda()
-        val_input2 = Variable(property).cuda()
-        score = model(val_input, val_input2)
-        confusion_matrix.add(score.data.squeeze(), label.type(t.LongTensor))
+    for dataloader in dataloader_list:
+        for ii, data in tqdm(enumerate(dataloader)):
+            input, property, label = data
+            label = label.view(-1)
+            val_input = Variable(input, volatile=True).cuda()
+            val_input2 = Variable(property).cuda()
+            score = model(val_input, val_input2)
+            confusion_matrix.add(score.data.squeeze(), label.type(t.LongTensor))
 
     model.train()
     cm_value = confusion_matrix.value()

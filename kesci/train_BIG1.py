@@ -8,41 +8,37 @@ from torchnet import meter
 from utils.visualize import Visualizer
 from models.BasicModule import BasicModule
 from tqdm import tqdm
-import time
 
 class Sequence(BasicModule):
     def __init__(self, input_size, hidden_dim, n_class):
         super(Sequence, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_dim, 2, batch_first=True)
         self.fc = nn.Linear(hidden_dim, n_class)
-        self.fc2 = nn.Linear(34, 64)
-        self.fc3 = nn.Linear(64, 1)
-        self.fc4 = nn.Linear(2, 6)
-        self.fc5 = nn.Linear(6, 2)
+        self.fc2 = nn.Linear(13, 32)
+        self.fc3 = nn.Linear(32, 10)
+        self.fc4 = nn.Linear(10, 2)
 
     def forward(self, input, input2):
         out, _ = self.lstm(input)
         out = self.fc(out[:, -1, :])
-        out2 = F.relu(self.fc2(input2))
-        out2 = F.relu(self.fc3(out2))
-        out = t.cat([out, out2], dim=1)
-        out = F.relu(self.fc4(out))
-        out = self.fc5(out)
+        out = t.cat([out, input2], dim=1)
+        out = F.relu(self.fc2(out))
+        out = F.relu(self.fc3(out))
+        out = self.fc4(out)
         return out
+
 
 def train():
     vis = Visualizer("Kesci")
-    train_data = AppData("data/train_23d_1p_ap.json", iflabel=True)
-    val_data = AppData("data/val_23d_1p_ap.json", iflabel=True)
-    train_dataloader = DataLoader(train_data, 256, shuffle=True, num_workers=4)
+    train_data = AppData("data/train_20d_3p.json", iflabel=True, datapath2="data/test_20d_3p.json")
+    val_data = AppData("data/val_20d_3p.json", iflabel=True)
+    train_dataloader = DataLoader(train_data, 512, shuffle=True, num_workers=4)
     val_dataloader = DataLoader(val_data, 256, shuffle=False, num_workers=2)
-    test_data = AppData("data/test_23d_1p_ap.json", iflabel=True)
-    test_dataloader = DataLoader(test_data, 256, shuffle=False, num_workers=2)
 
-    criterion = t.nn.CrossEntropyLoss(weight=t.Tensor([1, 1.2])).cuda()
-    learning_rate = 0.0005
+    criterion = t.nn.CrossEntropyLoss()
+    learning_rate = 0.01
     weight_decay = 0.0002
-    model = Sequence(15, 128, 1).cuda()
+    model = Sequence(14, 128, 1).cuda()
     optimizer = t.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
     loss_meter = meter.AverageValueMeter()
@@ -80,9 +76,9 @@ def train():
             'learning_rate': learning_rate
         })
 
-        # vis.log("epoch:{epoch},lr:{lr},loss:{loss},train_cm:{train_cm},val_cm:{val_cm}".format(
-        #     epoch=epoch, loss=loss_meter.value()[0], val_cm=str(val_cm.value()),
-        #     train_cm=str(confusion_matrix.value()), lr=learning_rate))
+        vis.log("epoch:{epoch},lr:{lr},loss:{loss},train_cm:{train_cm},val_cm:{val_cm}".format(
+            epoch=epoch, loss=loss_meter.value()[0], val_cm=str(val_cm.value()),
+            train_cm=str(confusion_matrix.value()), lr=learning_rate))
 
         if loss_meter.value()[0] > previous_loss:
             learning_rate = learning_rate * 0.95
@@ -92,13 +88,8 @@ def train():
 
         previous_loss = loss_meter.value()[0]
 
-        if epoch % 10 == 9:
+        if epoch % 20 == 19:
             model.save()
-            test_cm, test_f1 = val(model, test_dataloader)
-            vis.plot('test_f1', test_f1)
-            vis.log("{train_f1}, {val_f1}, {test_f1}, model:{model}, {train_cm}, {val_cm}, {test_cm}".format(
-                train_f1=train_f1, val_f1=val_f1, test_f1=test_f1, model=time.strftime('%m%d %H:%M:%S'),
-                train_cm=str(train_cm.value()), val_cm=str(val_cm.value()), test_cm=str(test_cm.value())))
 
 
 def val(model, dataloader):
