@@ -13,27 +13,29 @@ import time
 class Sequence(BasicModule):
     def __init__(self, input_size, hidden_dim, n_class):
         super(Sequence, self).__init__()
-        self.lstm1 = nn.LSTM(input_size, hidden_dim, 1, batch_first=True)
-        self.lstm2 = nn.LSTM(input_size, hidden_dim, 2, batch_first=True)
-        self.fc1 = nn.Linear(hidden_dim, n_class)
-        self.fc2 = nn.Linear(34, 32)
-        self.fc3 = nn.Linear(32, 1)
-        self.fc4 = nn.Linear(2, 6)
-        self.fc5 = nn.Linear(6, 2)
+        self.lstm1 = nn.LSTM(input_size, 256, 1, batch_first=True)
+        self.lstm2 = nn.LSTM(input_size, 128, 2, batch_first=True)
+        self.lstm1_fc = nn.Linear(256, n_class)
+        self.lstm2_fc = nn.Linear(128, n_class)
+        self.prop_fc1 = nn.Linear(34, 24)
+        self.prop_fc2 = nn.Linear(24, 1)
+        self.fc1 = nn.Linear(3, 3)
+        self.fc2 = nn.Linear(4, 6)
+        self.fc3 = nn.Linear(6, 2)
 
     def forward(self, input, input2):
-        data_lengh = len(input[0])
         out1, _ = self.lstm1(input)
-        out1 = self.fc(out1[:, -1, :])
+        out1 = self.lstm1_fc(out1[:, -1, :])
         out2, _ = self.lstm2(input)
-        out2 = self.fc(out2[:, -1, :])
-        out_lstm = t.cat([out1, out2])
-        out2 = F.relu(self.fc2(input2))
-        out2 = F.relu(self.fc3(out2))
-        out1 = t.cat([out1, out2], dim=1)
-        out1 = F.relu(self.fc4(out1))
-        out1 = self.fc5(out1)
-        return out1
+        out2 = self.lstm2_fc(out2[:, -1, :])
+        out = t.cat([out1, out2], dim=1)
+        day_input = Variable(t.Tensor([[input.size(1)]] * input.size(0))).cuda()
+        out = self.fc1(t.cat([out, day_input], dim=1))
+        out0 = self.prop_fc2(self.prop_fc1(input2))
+        out = t.cat([out, out0], dim=1)
+        out = F.relu(self.fc2(out))
+        out = F.relu(self.fc3(out))
+        return out
 
 
 def train():
@@ -42,9 +44,9 @@ def train():
     val_dataloader_list = [DataLoader(AppData("data/val_23d_change.json", iflabel=True, data_length=24-length), 128, shuffle=False, num_workers=2) for length in range(1, 24)]
     test_dataloader_list = [DataLoader(AppData("data/test_23d_change.json", iflabel=True, data_length=24-length), 128, shuffle=False, num_workers=2) for length in range(1, 24)]
 
-    criterion = t.nn.CrossEntropyLoss(weight=t.Tensor([1, 1.2])).cuda()
-    learning_rate = 0.001
-    weight_decay = 0.0005
+    criterion = t.nn.CrossEntropyLoss(weight=t.Tensor([1, 1.15])).cuda()
+    learning_rate = 0.01
+    weight_decay = 0.00012
     model = Sequence(15, 128, 1).cuda()
     optimizer = t.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
@@ -96,12 +98,14 @@ def train():
 
         previous_loss = loss_meter.value()[0]
 
-        if epoch % 10 == 9:
+        if epoch % 3 == 2:
             model.save()
             test_cm, test_f1 = val(model, test_dataloader_list)
             vis.plot('test_f1', test_f1)
-            vis.log("train_f1:{train_f1}, val_f1:{val_f1}, test_f1:{test_f1}, model:{model}".format(
-                train_f1=train_f1, val_f1=val_f1, test_f1=test_f1, model=time.strftime('%m%d %H:%M:%S')))
+
+            vis.log("{train_f1}, {val_f1}, {test_f1}, model:{model}, {train_cm}, {val_cm}, {test_cm}".format(
+                train_f1=train_f1, val_f1=val_f1, test_f1=test_f1, model=time.strftime('%m%d %H:%M:%S'),
+                train_cm=str(train_cm.value()[0][1]/train_cm.value()[1][0]), val_cm=str(val_cm.value()[0][1]/val_cm.value()[1][0]), test_cm=str(test_cm.value()[0][1]/test_cm.value()[1][0])))
 
 
 def val(model, dataloader_list):

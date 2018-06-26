@@ -32,15 +32,15 @@ class Sequence(BasicModule):
 
 def train():
     vis = Visualizer("Kesci")
-    train_data = AppData("data/train_23d_1p_ap.json", iflabel=True)
-    val_data = AppData("data/val_23d_1p_ap.json", iflabel=True)
-    train_dataloader = DataLoader(train_data, 256, shuffle=True, num_workers=4)
+    train_data = AppData("data/data_16d_target/train.json", iflabel=True)
+    val_data = AppData("data/data_16d_target/val.json", iflabel=True)
+    train_dataloader = DataLoader(train_data, 32, shuffle=True, num_workers=4)
     val_dataloader = DataLoader(val_data, 256, shuffle=False, num_workers=2)
-    test_data = AppData("data/test_23d_1p_ap.json", iflabel=True)
+    test_data = AppData("data/data_16d_target/test.json", iflabel=True)
     test_dataloader = DataLoader(test_data, 256, shuffle=False, num_workers=2)
 
-    criterion = t.nn.CrossEntropyLoss(weight=t.Tensor([1, 1.2])).cuda()
-    learning_rate = 0.0005
+    criterion = t.nn.CrossEntropyLoss().cuda()
+    learning_rate = 0.003
     weight_decay = 0.0002
     model = Sequence(15, 128, 1).cuda()
     optimizer = t.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
@@ -65,6 +65,7 @@ def train():
             optimizer.step()
 
             loss_meter.add(loss.data[0])
+
             confusion_matrix.add(output.data, target.data)
 
             if ii % 100 == 99:
@@ -96,9 +97,16 @@ def train():
             model.save()
             test_cm, test_f1 = val(model, test_dataloader)
             vis.plot('test_f1', test_f1)
-            vis.log("{train_f1}, {val_f1}, {test_f1}, model:{model}, {train_cm}, {val_cm}, {test_cm}".format(
-                train_f1=train_f1, val_f1=val_f1, test_f1=test_f1, model=time.strftime('%m%d %H:%M:%S'),
-                train_cm=str(train_cm.value()), val_cm=str(val_cm.value()), test_cm=str(test_cm.value())))
+            vis.log(
+                "model:{model} | {train_f1}, {train_pre}, {train_rec} | {val_f1}, {val_pre}, {val_rec} | {test_f1}, {test_pre}, {test_rec}".format(
+                    train_f1=train_f1, val_f1=val_f1, test_f1=test_f1, model=time.strftime('%m%d %H:%M:%S'),
+                    train_pre=str(train_cm.value()[0][0] / train_cm.value()[:, 0].sum()),
+                    train_rec=str(train_cm.value()[0][0] / train_cm.value()[0].sum()),
+                    val_pre=str(val_cm.value()[0][0] / val_cm.value()[:, 0].sum()),
+                    val_rec=str(val_cm.value()[0][0] / val_cm.value()[0].sum()),
+                    test_pre=str(test_cm.value()[0][0] / test_cm.value()[:, 0].sum()),
+                    test_rec=str(test_cm.value()[0][0] / test_cm.value()[0].sum())
+                ))
 
 
 def val(model, dataloader):

@@ -46,7 +46,12 @@ class AppData(data.Dataset):
         #properties = t.cat([one_hot, active_percent], dim=0)
 
         if self.iflabel:
-            label = t.LongTensor([self.data[index]['label']])
+            label = self.data[index]['target']
+            if label > 0.5:
+                label = 1
+            else:
+                label = 0
+            label = t.LongTensor([label])
             return user_log, one_hot, label
         else:
             return user_log, one_hot, self.data[index]['user_id']
