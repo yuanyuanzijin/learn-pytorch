@@ -16,7 +16,7 @@ class AppData(data.Dataset):
 
     def __getitem__(self, index):
         data = np.array(self.data[index]['data'], dtype=np.float32)
-        data = np.delete(data, [22,23,24,25,26], axis=1)
+        data = np.delete(data, [25,26], axis=1)
         user_log = t.from_numpy(data)
         user_log[:,2] = (user_log[:,2] - 0.162) / 0.136
         user_log[:,4] = (user_log[:,4] - 0.023) / 0.111
@@ -34,6 +34,8 @@ class AppData(data.Dataset):
         user_log[:,17] = (user_log[:,17]) / 43.1
         user_log[:,18] = (user_log[:,18] - 4.90) / 941
         user_log[:,19] = (user_log[:,19]) / 2.55
+        user_log[:,20] = (user_log[:,20] - 0.0006) / 0.0066
+        user_log[:,21] = (user_log[:,21] - 0.00002) / 0.00006
 
         user_source = int(self.data[index]['source'])
         one_hot_source = t.zeros(12)
@@ -48,15 +50,15 @@ class AppData(data.Dataset):
         #active_percent = t.FloatTensor([self.data[index]['active_percent']])
         #user_new = t.Tensor([int(self.data[index]['new'])])
         #properties = t.cat([one_hot, active_percent], dim=0)
-        #times_to_label = [0, 0.8, 0.85, 0.9, 0.95, 0.98, 0.99, 1.0]
+        # times_to_label = [0, 0.9, 0.92, 0.94, 0.96, 0.98, 0.99, 1.0]
         if self.iflabel:
             times = self.data[index]['target']
-            # if times > 0.5:
-            #     target = 1
-            # else:
-            #     target = 0
-            #target = times_to_label[times]
-            target = t.FloatTensor([times])
+            if times > 0.5:
+                target = 1
+            else:
+                target = 0
+            # target = times_to_label[times]
+            target = t.FloatTensor([target])
             return user_log, one_hot, target
         else:
             return user_log, one_hot, self.data[index]['user_id']
